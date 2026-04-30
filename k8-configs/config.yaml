@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    creationTimestamp: null
+    labels:
+        app: flights-hyd
+    name: flights-hyd
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: flights-hyd
+    strategy: {}
+    template:
+        metadata:
+            creationTimestamp: null
+            labels:
+                app: flights-hyd
+        spec:
+            containers:
+            -   image: siddhantgahtori/do-assessment:latest
+                name: do-assessment
+                resources:
+                    requests:
+                        cpu: "50m"
+                    limits:
+                        memory: "512Mi"
+status: {}

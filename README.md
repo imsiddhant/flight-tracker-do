@@ -1,6 +1,6 @@
 # HYD Flight Tracker
 
-Live flight tracking dashboard for Hyderabad airspace — ADS-B positions, METAR weather, DigitalOcean-themed UI. No API keys required.
+Live flight tracking dashboard for Hyderabad airspace. Shows real-time ADS-B flight positions, routes, and live METAR weather for RGIA (VOHS/HYD). No API keys required.
 
 ---
 
@@ -16,8 +16,8 @@ Live flight tracking dashboard for Hyderabad airspace — ADS-B positions, METAR
 │   ├── Dockerfile
 │   └── .dockerignore
 ├── k8-configs/
-│   ├── config.yaml        # Deployment (resource limits + CPU request)
-│   ├── hpa.yaml           # HorizontalPodAutoscaler (CPU-based, 70%)
+│   ├── config.yaml        # Deployment with resource limits
+│   ├── hpa.yaml           # HorizontalPodAutoscaler (CPU-based)
 │   └── loadbalancer.yaml  # LoadBalancer service on port 80
 ├── .gitignore
 └── README.md
@@ -25,7 +25,7 @@ Live flight tracking dashboard for Hyderabad airspace — ADS-B positions, METAR
 
 ---
 
-## Run locally
+## 1. Run locally
 
 ```bash
 npm install
@@ -36,51 +36,77 @@ Open `http://localhost:3000`.
 
 ---
 
-## Build & push Docker image
+## 2. Build Docker image
 
-Build context must be the project root:
+Run from the project root — build context must be here, not inside `docker/`:
 
 ```bash
 docker build -f docker/Dockerfile -t siddhantgahtori/do-assessment:latest .
+```
+
+---
+
+## 3. Push to Docker Hub
+
+```bash
+docker login
 docker push siddhantgahtori/do-assessment:latest
 ```
 
 ---
 
-## Deploy to DOKS
+## 4. Deploy to DigitalOcean Kubernetes (DOKS)
 
-**1. Connect kubectl to your cluster**
+### Step 1 — Connect kubectl to the cluster
+
 ```bash
 doctl kubernetes cluster kubeconfig save <your-cluster-name>
 ```
 
-**2. Apply all manifests**
+Verify the connection:
+
 ```bash
-kubectl apply -f k8-configs/
+kubectl get nodes
 ```
 
-**3. Get the LoadBalancer IP**
+### Step 2 — Apply the Deployment
+
+```bash
+kubectl apply -f k8-configs/config.yaml
+```
+
+Check it rolled out:
+
+```bash
+kubectl get deployment flights-hyd
+kubectl get pods
+```
+
+### Step 3 — Apply the LoadBalancer service
+
+```bash
+kubectl apply -f k8-configs/loadbalancer.yaml
+```
+
+Wait for the external IP to be assigned (takes ~60 seconds on DOKS):
+
 ```bash
 kubectl get svc primary-lb
 ```
 
-App is available on port 80 of the external IP.
+The app is reachable on port 80 of that external IP.
 
----
-
-## Test HPA
+### Step 4 — Apply the HPA
 
 ```bash
-# Scale up first if replicas are 0
-kubectl scale deployment flights-hyd --replicas=1
-
-# Run a load generator
-kubectl run load-gen --image=busybox --restart=Never \
-  -- /bin/sh -c "while true; do wget -q -O- http://primary-lb/api/flights; done"
-
-# Watch HPA react
-kubectl get hpa flights-hyd -w
-
-# Clean up
-kubectl delete pod load-gen
+kubectl apply -f k8-configs/hpa.yaml
 ```
+
+Verify it is attached and reading metrics:
+
+```bash
+kubectl get hpa flights-hyd
+kubectl describe hpa flights-hyd
+```
+
+The HPA scales the deployment between 1 and 3 replicas when CPU crosses 70% of the requested 50m.

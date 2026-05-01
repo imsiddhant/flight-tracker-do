@@ -96,7 +96,25 @@ kubectl get svc primary-lb
 
 The app is reachable on port 80 of that external IP.
 
-### Step 4 — Apply the HPA
+### Step 4 — Install Metrics Server
+
+Required for HPA to read CPU metrics. The `--kubelet-insecure-tls` patch is needed on DOKS:
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+kubectl patch deployment metrics-server -n kube-system \
+  --type=json \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+```
+
+Verify it is working (may take ~60 seconds):
+
+```bash
+kubectl top nodes
+```
+
+### Step 5 — Apply the HPA
 
 ```bash
 kubectl apply -f k8-configs/hpa.yaml
